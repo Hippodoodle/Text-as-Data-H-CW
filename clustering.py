@@ -156,40 +156,47 @@ def main():
     centroids = pick_random_centroids(5, len(vocab))
     print(len(centroids), len(centroids[0]))
 
-    # Step 2: Assign each vector to its closest centroid
-    cluster_ids = []
-    vectors = []
-    for scipy_vector in tfidf_sparse_matrix:
-        vector = dict(zip(scipy_vector.indices, scipy_vector.data))
-        vectors.append(vector)
-        cluster_ids.append(assign_to_cluster(vector, centroids))
-    print(cluster_ids[:10])
+    done_flag = False
+    while not done_flag:
+        prev_centroids = centroids
 
-    # Step 3: Recalculate the centroids based on the closest vectors
-    centroids = []
-    unique_clusters = set(cluster_ids)
+        # Step 2: Assign each vector to its closest centroid
+        cluster_ids = []
+        vectors = []
+        for scipy_vector in tfidf_sparse_matrix:
+            vector = dict(zip(scipy_vector.indices, scipy_vector.data))
+            vectors.append(vector)
+            cluster_ids.append(assign_to_cluster(vector, centroids))
+        print(cluster_ids[:10])
 
-    for cluster_id in unique_clusters:
-        cluster_vectors = []
-        for i in range(len(vectors)):
-            if cluster_ids[i] == cluster_id:
-                cluster_vectors.append(vectors[i])
+        # Step 3: Recalculate the centroids based on the closest vectors
+        centroids = []
+        unique_clusters = set(cluster_ids)
 
-        common_keys = set()  # TODO: understand this bit
-        for v in cluster_vectors:
-            common_keys.update(v.keys())
+        for cluster_id in unique_clusters:
+            cluster_vectors = []
+            for i in range(len(vectors)):
+                if cluster_ids[i] == cluster_id:
+                    cluster_vectors.append(vectors[i])
 
-        centroid = {}
-        for key in common_keys:
-            values = []
+            common_keys = set()  # TODO: understand this bit
             for v in cluster_vectors:
-                values.append(v.get(key, 0))
-            avg_value = sum(values) / len(cluster_vectors)
-            centroid[key] = avg_value
+                common_keys.update(v.keys())
 
-        centroids.append(centroid)
+            centroid = {}
+            for key in common_keys:
+                values = []
+                for v in cluster_vectors:
+                    values.append(v.get(key, 0))
+                avg_value = sum(values) / len(cluster_vectors)
+                centroid[key] = avg_value
 
-    print(len(centroids), len(centroids[0]))
+            centroids.append(centroid)
+
+        if centroids == prev_centroids:
+            done_flag = True
+
+        print(len(centroids), len(centroids[0]))
 
     """
     centroids = []
