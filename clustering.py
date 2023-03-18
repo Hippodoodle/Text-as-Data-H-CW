@@ -1,9 +1,11 @@
 
 import math
 import random
+import time
 from collections import Counter
 
 import pandas as pd
+import numpy as np
 import spacy
 from tqdm import tqdm
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -104,7 +106,7 @@ def main():
         2 -> neither
 
     tweet_id,class,tweet_body,split
-    0,2,"!!!...",training
+    0,2,"!!!...",train
     ...
 
     Class Balance:
@@ -149,16 +151,14 @@ def main():
     vectoriser = TfidfVectorizer(tokenizer=text_pipeline_spacy)
     tfidf_sparse_matrix = vectoriser.fit_transform(dataset["tweet_body"])
     vocab = list(vectoriser.get_feature_names_out())
-    # print(tfidf_sparse_matrix, tfidf_sparse_matrix.shape, type(tfidf_sparse_matrix))
-    # print(vocab[14501], vocab[11115], vocab[5367], vocab[8961], vocab[6643], vocab[15184], vocab[3283], vocab[13065])
 
     # Step 1: Pick k random "centroids"
     centroids = pick_random_centroids(5, len(vocab))
-    print(len(centroids), len(centroids[0]))
 
     done_flag = False
+    iteration = 0
     while not done_flag:
-        prev_centroids = centroids
+        prev_centroids = list(centroids)
 
         # Step 2: Assign each vector to its closest centroid
         cluster_ids = []
@@ -167,7 +167,8 @@ def main():
             vector = dict(zip(scipy_vector.indices, scipy_vector.data))
             vectors.append(vector)
             cluster_ids.append(assign_to_cluster(vector, centroids))
-        print(cluster_ids[:10])
+
+        print(f"Iteration {iteration}")
 
         # Step 3: Recalculate the centroids based on the closest vectors
         centroids = []
@@ -179,7 +180,7 @@ def main():
                 if cluster_ids[i] == cluster_id:
                     cluster_vectors.append(vectors[i])
 
-            common_keys = set()  # TODO: understand this bit
+            common_keys = set()
             for v in cluster_vectors:
                 common_keys.update(v.keys())
 
@@ -196,14 +197,48 @@ def main():
         if centroids == prev_centroids:
             done_flag = True
 
-        print(len(centroids), len(centroids[0]))
+        iteration += 1
 
-    """
-    centroids = []
-    clusters = set(cluster_ids)
-    for cluster_id in clusters:
-    """
+    print(f"Converged after {iteration} iterations")
+    print(f"Cluster 1 size: {len(centroids[0])}")
+    print(f"Cluster 2 size: {len(centroids[1])}")
+    print(f"Cluster 3 size: {len(centroids[2])}")
+    print(f"Cluster 4 size: {len(centroids[3])}")
+    print(f"Cluster 5 size: {len(centroids[4])}")
+
+    clusters_with_examples = {}
+    for cluster in range(len(centroids)):
+        example_tweets = []
+        for index, cluster_id in enumerate(cluster_ids):
+            if cluster_id == cluster and len(example_tweets) < 3:
+                example_tweets.append(dataset["tweet_body"][index])
+            elif len(example_tweets) >= 3:
+                break
+        clusters_with_examples[cluster] = example_tweets
+
+    # Print example tweets
+    for cluster, tweets in clusters_with_examples.items():
+        print(f"Cluster {cluster}:")
+        for tweet in tweets:
+            print(tweet)
+
+    # Print top 5 tokens
+    for cluster in range(len(centroids)):
+        top_5_tokens = [vocab[word_value_pair[0]] for word_value_pair in sorted(centroids[cluster].items(), reverse=True, key=lambda x: x[1])[:5]]
+        print(f"Top tokens in centroid {cluster}: {top_5_tokens}")
+
+    # Create confusion matrix
+    confusion_matrix: np.ndarray = np.zeros((5, 3))
+
+    for index, cluster_id in enumerate(cluster_ids):
+        confusion_matrix[cluster_id, dataset["class"][index]] += 1
+
+    dataframe = pd.DataFrame(confusion_matrix, columns=["Hate Speech", "Offensive Language", "Neither"], index=[1, 2, 3, 4, 5])
+    print(dataframe)
 
 
 if __name__ == "__main__":
+    start = time.time()
     main()
+    end = time.time()
+    print(f"Time taken: {end - start}")
